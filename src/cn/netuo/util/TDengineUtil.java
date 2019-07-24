@@ -21,10 +21,9 @@ public class TDengineUtil
     private boolean databaseColumnHumpToLine;
 
     /**
-     *
-     * @param url url 例如 ： "jdbc:TAOS://127.0.0.1:6020/netuo_iot"
-     * @param username 例如： "root"
-     * @param password 例如： "taosdata"
+     * @param url                      url 例如 ： "jdbc:TAOS://127.0.0.1:6020/netuo_iot"
+     * @param username                 例如： "root"
+     * @param password                 例如： "taosdata"
      * @param databaseColumnHumpToLine 是否需要数据库列名下划线转驼峰
      */
     public TDengineUtil(String url, String username, String password, boolean databaseColumnHumpToLine) throws ClassNotFoundException, SQLException
@@ -43,7 +42,6 @@ public class TDengineUtil
     }
 
     /**
-     *
      * @param connection
      * @param databaseColumnHumpToLine
      */
@@ -52,7 +50,6 @@ public class TDengineUtil
         this.connection = connection;
         this.databaseColumnHumpToLine = databaseColumnHumpToLine;
     }
-
 
 
     /**
@@ -119,45 +116,94 @@ public class TDengineUtil
 
     /**
      * 插入对象到指定的表里面
+     *
      * @param tableName
      * @param o
      * @return
      * @throws SQLException
      */
     @SuppressWarnings("all")
-    public boolean insert(String tableName,Object o) throws SQLException
+    public boolean insert(String tableName, Object o) throws SQLException
     {
-        Class clazz = o.getClass();
-        Map<String,Object> map = BeanMap.create(o);
+        Map<String, Object> map = BeanMap.create(o);
 
-        String sql = createInsertSql(tableName,map);
+        String sql = createInsertSql(tableName, map);
         return connection.createStatement().execute(sql);
     }
 
+
+    public boolean insertWithStable(String tableName, String sTableName, Object o, String... tags) throws SQLException
+    {
+
+        Map<String, Object> map = BeanMap.create(o);
+
+        String sql = createInsertStableSql(tableName,sTableName, map,tags);
+        return connection.createStatement().execute(sql);
+
+    }
+
     /**
-     * 生成插入sql语句
+     * 生成插入Stable的sql语句
+     *
      * @param tableName
      * @param map
      * @return
      */
-    public static String createInsertSql(String tableName,Map<String,Object> map)
+    public static String createInsertStableSql(String tableName, String sTbaleName, Map<String, Object> map, String... tags)
     {
-        StringBuilder buffer = new StringBuilder();
-        buffer.append("INSERT INTO ").append(tableName).append(" (");
+        StringBuilder builder = new StringBuilder();
+        builder.append("INSERT INTO ").append(tableName);
+        builder.append(stableToSQL(sTbaleName, tags));
+        builder.append(mapToSQL(map));
 
-        Set<Map.Entry<String,Object>> set = map.entrySet();
+        return builder.toString();
+    }
+
+    private static String stableToSQL(String sTableName, String... tags)
+    {
+        StringBuilder builder = new StringBuilder();
+        builder.append(" using ").append(sTableName).append(" TAGS ( ");
+        for (String tag : tags)
+        {
+            builder.append("'").append(tag).append("',");
+        }
+        builder.deleteCharAt(builder.length() - 1).append(" ) ");
+
+        return builder.toString();
+    }
+
+    /**
+     * 生成插入sql语句
+     *
+     * @param tableName
+     * @param map
+     * @return
+     */
+    public static String createInsertSql(String tableName, Map<String, Object> map)
+    {
+        StringBuilder builder = new StringBuilder();
+        builder.append("INSERT INTO ").append(tableName);
+        builder.append(mapToSQL(map));
+
+        return builder.toString();
+    }
+
+    public static String mapToSQL(Map<String, Object> map)
+    {
+        StringBuilder builder = new StringBuilder();
+        Set<Map.Entry<String, Object>> set = map.entrySet();
 
         StringBuilder keys = new StringBuilder(" ");
         StringBuilder value = new StringBuilder(" ");
 
-        for (Map.Entry<String,Object> entry : set)
+        for (Map.Entry<String, Object> entry : set)
         {
             keys.append(humpToLine(entry.getKey())).append(",");
             try
             {
                 if (entry.getValue().getClass().equals(Date.class))
                 {
-                    Date d = (Date)entry.getValue();
+                    Date d = (Date) entry.getValue();
                     value.append(d.getTime()).append(",");
                 }
                 else
@@ -171,12 +217,11 @@ public class TDengineUtil
             }
         }
 
-        keys.deleteCharAt(keys.length()-1);
-        value.deleteCharAt(value.length()-1);
+        keys.deleteCharAt(keys.length() - 1);
+        value.deleteCharAt(value.length() - 1);
 
-        buffer.append(keys).append(") VALUES( ").append(value).append(")");
-
-        return buffer.toString();
+        builder.append(" (").append(keys).append(") VALUES( ").append(value).append(")");
+        return builder.toString();
     }
 
 
@@ -221,7 +266,6 @@ public class TDengineUtil
 
                 //因为标准的setter方法只会有一个参数，所以取一个就行了
                 Class getParamClass = method.getParameterTypes()[0];
-
 
 
                 //获得查询的结果
@@ -358,12 +402,16 @@ public class TDengineUtil
 
     private static Pattern linePattern = Pattern.compile("_(\\w)");
 
-    /** 下划线转驼峰 */
-    public static String lineToHump(String str) {
+    /**
+     * 下划线转驼峰
+     */
+    public static String lineToHump(String str)
+    {
         str = str.toLowerCase();
         Matcher matcher = linePattern.matcher(str);
         StringBuffer sb = new StringBuffer();
-        while (matcher.find()) {
+        while (matcher.find())
+        {
             matcher.appendReplacement(sb, matcher.group(1).toUpperCase());
         }
         matcher.appendTail(sb);
@@ -386,4 +434,6 @@ public class TDengineUtil
         matcher.appendTail(sb);
         return sb.toString();
     }
+
+
 }
